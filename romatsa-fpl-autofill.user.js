@@ -83,6 +83,7 @@
         set('ENDURANCE', '1000');
         set('PERSONBOARD', '2');
         set('ACFT_COLOUR', ac.color);
+        set('REMARKS', 'ZBOR SCOALA');
 
         /* 2 ── TICK the correct equipment & capability boxes */
 
@@ -99,9 +100,17 @@
 
         untickAll('EQPT');
         untickAll('SEQPT');
+        untickAll('SURV_EQPT');   
+        untickAll('JACKETS');
+        untickAll('UHF');
+        untickAll('UHT');
 
         tickSet('EQPT',  ac.equip || 'Y');   
-        tickSet('SEQPT', ac.surv || 'S');// example: Mode‑S transponder
+        tickSet('SEQPT', ac.surv || 'S');
+        tickSet('SURV_EQPT', 'PDMJ');
+        tickSet('JACKETS', 'LFUV');
+        tickSet('UHF', 'U');
+        tickSet('UHT', 'E');
 
 
         console.log('[ROMATSA‑auto] form filled for', reg);
