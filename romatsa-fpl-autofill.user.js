@@ -1,9 +1,12 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      2025.4.24
+// @version      1.0.0
 // @author       Avrigeanu Sebastian
+// @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
 // @match        https://flightplan.romatsa.ro/index.php?option=com_wrapper&view=wrapper&Itemid=69*
+// @downloadURL  https://github.com/sand14/romatsa-auto-flightplan/raw/refs/heads/main/romatsa-fpl-autofill.user.js
+// @updateURL    https://github.com/sand14/romatsa-auto-flightplan/raw/refs/heads/main/romatsa-fpl-autofill.user.js
 // @grant        none
 // ==/UserScript==
 
@@ -12,11 +15,11 @@
 
     /* ─────── YOUR FLEET (add / edit as needed) ─────── */
     const FLEET = {
-        'YR5651': { type: 'SVNH', wake: 'L', equip: 'SY', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YR5604': { type: 'SVNH', wake: 'L', equip: 'SY', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
     };
     /* Default values if you leave a property out of a fleet entry */
-    const DEFAULTS = { speed: 'N0140', level: 'VFR' };
+    const DEFAULTS = { speed: 'K0140', level: 'VFR' };
     /* ──────────────────────────────────────────────── */
 
     /* wait for iframe to load */
