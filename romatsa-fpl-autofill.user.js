@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.0
+// @version      1.0.1
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -87,6 +87,7 @@
         set('PERSONBOARD', '2');
         set('ACFT_COLOUR', ac.color);
         set('REMARKS', 'ZBOR SCOALA');
+        set('RMK', 'PIC');
 
         /* 2 ── TICK the correct equipment & capability boxes */
 
