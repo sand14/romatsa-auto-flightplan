@@ -88,7 +88,6 @@
         set('PERSONBOARD', '2');
         set('ACFT_COLOUR', ac.color);
         set('REMARKS', 'ZBOR SCOALA');
-        set('RMK', 'PIC');
 
         /* 2 ── TICK the correct equipment & capability boxes */
 
