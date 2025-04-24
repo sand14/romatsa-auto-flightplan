@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.3
+// @version      1.0.4
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -17,7 +17,7 @@
     const FLEET = {
         'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED' },
+        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED' }
     };
     /* Default values if you leave a property out of a fleet entry */
     const DEFAULTS = { speed: 'K0140', level: 'VFR' };
@@ -50,12 +50,14 @@
 
     function autofill(doc, reg) {
         if (!reg) return;
-        const d   = new Date();
+        const d = new Date();
         d.setUTCMinutes(d.getUTCMinutes() + 20);
-        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 5) * 10, 0, 0);
+        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 10) * 10, 0, 0);
 
         const hhmm = d.toISOString().slice(11,16).replace(':','');
-        const ac   = { ...DEFAULTS, ...FLEET[reg] };
+        const iso = d.toISOString().slice(0,10).replace(/-/g,'');
+        const dof = iso.slice(2);
+        const ac = { ...DEFAULTS, ...FLEET[reg] };
 
         /* helper: set by name (first matching element) */
         const set = (name,val) => {
@@ -64,15 +66,16 @@
         };
 
         /* 1 ── plain text / select fields */
-        set('ARCID',   reg);
-        set('FLTRUL',  'V'); 
-        set('FLTTYP',  'G');
-        set('ARCTYP',  ac.type);
-        set('WKTRB',   ac.wake);
+        set('ARCID', reg);
+        set('FLTRUL', 'V');
+        set('FLTTYP', 'G');
+        set('ARCTYP', ac.type);
+        set('WKTRB', ac.wake);
 
-        set('IOBT',    hhmm);
+        set('IOBT', hhmm);
+        set('IOBD', dof);
 
-        set('SPEED',   ac.speed);
+        set('SPEED', ac.speed);
         set('FLLEVEL', ac.level);
 
         set('ROUTE', 'ZONA BRASOV GHIMBAV');
@@ -92,9 +95,10 @@
         /* 2 ── TICK the correct equipment & capability boxes */
 
         /** convenience: untick everything first, then tick what we need */
-        const untickAll = name =>
-        doc.querySelectorAll(`input[type="checkbox"][name="${name}"]`)
-        .forEach(cb => cb.checked = false);
+        const untickAll = name => {
+            doc.querySelectorAll(`input[type="checkbox"][name="${name}"]`)
+               .forEach(cb => { cb.checked = false; });
+          };
 
         const tickSet = (name, codes /*string like "SDFG" or "E1E2"*/ ) =>
         codes.match(/([A-Z]\d?)/g)?.forEach(code => {
@@ -104,12 +108,12 @@
 
         untickAll('EQPT');
         untickAll('SEQPT');
-        untickAll('SURV_EQPT');   
+        untickAll('SURV_EQPT');
         untickAll('JACKETS');
         untickAll('UHF');
         untickAll('UHT');
 
-        tickSet('EQPT',  ac.equip || 'Y');   
+        tickSet('EQPT', ac.equip || 'Y');
         tickSet('SEQPT', ac.surv || 'S');
         tickSet('SURV_EQPT', 'PDMJ');
         tickSet('JACKETS', 'LFUV');
