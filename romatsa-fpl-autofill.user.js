@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.2
+// @version      2025.4.24
+// @author       Avrigeanu Sebastian
 // @description  Adds an aircraft picker and fills the New Flight Plan form
 // @match        https://flightplan.romatsa.ro/index.php?option=com_wrapper&view=wrapper&Itemid=69*
 // @grant        none
@@ -11,11 +12,11 @@
 
     /* ─────── YOUR FLEET (add / edit as needed) ─────── */
     const FLEET = {
-        'YR‑ABC': { type: 'C172', wake: 'L', equip: 'SDFGIR', pbn: 'A1B2', speed: 'K0120', level: 'VFR' },
-        'YR‑XYZ': { type: 'PA34', wake: 'L', equip: 'SFG',    pbn: 'A1B2C2', speed: 'N0150', level: 'VFR' },
+        'YR5651': { type: 'SVNH', wake: 'L', equip: 'SY', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YR5604': { type: 'SVNH', wake: 'L', equip: 'SY', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
     };
     /* Default values if you leave a property out of a fleet entry */
-    const DEFAULTS = { speed: 'N0120', level: 'F085' };
+    const DEFAULTS = { speed: 'N0140', level: 'VFR' };
     /* ──────────────────────────────────────────────── */
 
     /* wait for iframe to load */
@@ -26,7 +27,7 @@
 
     function onFrameLoad() {
         const doc = frame.contentDocument;
-        if (!doc || doc.querySelector('#acPicker')) return;           // already injected
+        if (!doc || doc.querySelector('#acPicker')) return;
 
         /* build picker */
         const sel = doc.createElement('select');
@@ -45,12 +46,11 @@
 
     function autofill(doc, reg) {
         if (!reg) return;
-        const d   = new Date();               // now (local JS clock is UTC‑aware)
-        d.setUTCMinutes(d.getUTCMinutes() + 30);
+        const d   = new Date();
+        d.setUTCMinutes(d.getUTCMinutes() + 20);
         d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 5) * 5, 0, 0);
 
-        const hhmm = d.toISOString().slice(11,16).replace(':',''); // "HHMM"
-        const dof  = d.toISOString().slice(0,10).replace(/-/g,'');
+        const hhmm = d.toISOString().slice(11,16).replace(':','');
         const ac   = { ...DEFAULTS, ...FLEET[reg] };
 
         /* helper: set by name (first matching element) */
@@ -61,21 +61,28 @@
 
         /* 1 ── plain text / select fields */
         set('ARCID',   reg);
-        set('FLTRUL',  'V');           // adjust as needed
+        set('FLTRUL',  'V'); 
         set('FLTTYP',  'G');
         set('ARCTYP',  ac.type);
         set('WKTRB',   ac.wake);
 
-        set('ADEP',    'LRSB');
         set('IOBT',    hhmm);
 
         set('SPEED',   ac.speed);
         set('FLLEVEL', ac.level);
 
-        set('ROUTE',   'DCT XYZ VFR');
-        set('ADES',    'LRBS');
-        set('TTLEET',  '0045');
-        set('ALTRNT1', 'LRCL');
+        set('ROUTE', 'ZONA BRASOV GHIMBAV');
+        set('ADES', 'ZZZZ');
+        set('ADEP', 'ZZZZ');
+        set('TTLEET', '0900');
+        set('ALTRNT1', 'LRSP');
+        set('ALTRNT2', 'LRSB');
+        set('DEPZ', 'GHIMBAV 4541N02531E');
+        set('DESTZ', 'GHIMBAV 4541N02531E');
+        set('OPR', 'AEROCLUBUL ROMANIEI');
+        set('ENDURANCE', '1000');
+        set('PERSONBOARD', '2');
+        set('ACFT_COLOUR', ac.color);
 
         /* 2 ── TICK the correct equipment & capability boxes */
 
@@ -93,14 +100,9 @@
         untickAll('EQPT');
         untickAll('SEQPT');
 
-        tickSet('EQPT',  ac.equip);    // e.g. "SDFGIR"
-        tickSet('SEQPT', ac.surv || 'S'); // example: Mode‑S transponder
+        tickSet('EQPT',  ac.equip || 'Y');   
+        tickSet('SEQPT', ac.surv || 'S');// example: Mode‑S transponder
 
-        /* 3 ── optional: DOF in Other‑Information text area */
-        const other = doc.querySelector('textarea[name="PLNITEM18"]')   // adapt if the name differs
-        if (other && !other.value.includes('DOF/')) {
-            other.value = `DOF/${dof} PBN/${ac.pbn}`.trim();
-        }
 
         console.log('[ROMATSA‑auto] form filled for', reg);
     }
