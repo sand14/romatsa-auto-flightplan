@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.1
+// @version      1.0.2
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -17,6 +17,7 @@
     const FLEET = {
         'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED' },
     };
     /* Default values if you leave a property out of a fleet entry */
     const DEFAULTS = { speed: 'K0140', level: 'VFR' };
@@ -51,7 +52,7 @@
         if (!reg) return;
         const d   = new Date();
         d.setUTCMinutes(d.getUTCMinutes() + 20);
-        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 5) * 5, 0, 0);
+        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 10) * 5, 0, 0);
 
         const hhmm = d.toISOString().slice(11,16).replace(':','');
         const ac   = { ...DEFAULTS, ...FLEET[reg] };
