@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.2
+// @version      1.0.3
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -52,7 +52,7 @@
         if (!reg) return;
         const d   = new Date();
         d.setUTCMinutes(d.getUTCMinutes() + 20);
-        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 10) * 5, 0, 0);
+        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 5) * 10, 0, 0);
 
         const hhmm = d.toISOString().slice(11,16).replace(':','');
         const ac   = { ...DEFAULTS, ...FLEET[reg] };
