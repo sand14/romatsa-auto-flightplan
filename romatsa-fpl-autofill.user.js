@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.6
+// @version      1.0.7
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -17,10 +17,10 @@
     const FLEET = {
         'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED' }
+        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' }
     };
     /* Default values if you leave a property out of a fleet entry */
-    const DEFAULTS = { speed: 'K0140', level: 'VFR' };
+    const DEFAULTS = { speed: 'K0140', level: 'VFR', endurance: '0500' };
     /* ──────────────────────────────────────────────── */
 
     /* wait for iframe to load */
@@ -86,7 +86,7 @@
         set('DEPZ', 'GHIMBAV 4541N02531E');
         set('DESTZ', 'GHIMBAV 4541N02531E');
         set('OPR', 'AEROCLUBUL ROMANIEI');
-        set('ENDURANCE', '0500');
+        set('ENDURANCE', ac.endurance);
         set('PERSONBOARD', '2');
         set('ACFT_COLOUR', ac.color);
         set('REMARKS', 'ZBOR SCOALA');
