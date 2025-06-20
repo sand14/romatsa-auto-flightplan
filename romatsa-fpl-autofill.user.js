@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.7
+// @version      1.0.8
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -17,10 +17,11 @@
     const FLEET = {
         'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' }
+        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' },
+        'YRARI': { type: 'CRUZ', wake: 'L', equip: 'ODY', surv: 'S', speed: 'K0160', level: 'VFR', color: 'WHITE AND BLUE DOTS', endurance: '0600', hasElt: true }
     };
     /* Default values if you leave a property out of a fleet entry */
-    const DEFAULTS = { speed: 'K0140', level: 'VFR', endurance: '0500' };
+    const DEFAULTS = { speed: 'K0140', level: 'VFR', endurance: '0500', hasElt: false };
     /* ──────────────────────────────────────────────── */
 
     /* wait for iframe to load */
@@ -117,7 +118,11 @@
         tickSet('SURV_EQPT', 'PDMJ');
         tickSet('JACKETS', 'LFUV');
         tickSet('UHF', 'U');
-        tickSet('UHT', 'E');
+
+        if (!ac.hasElt)
+        {
+            tickSet('UHT', 'E');
+        }
 
 
         console.log('[ROMATSA‑auto] form filled for', reg);
