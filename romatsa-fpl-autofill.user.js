@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.10
+// @version      1.0.11
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -15,9 +15,9 @@
 
     /* ─────── YOUR FLEET (add / edit as needed) ─────── */
     const FLEET = {
-        'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
-        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv:'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' },
+        'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
+        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' },
         'YRARI': { type: 'CRUZ', wake: 'L', equip: 'ODY', surv: 'S', speed: 'K0160', level: 'VFR', color: 'WHITE AND BLUE DOTS', endurance: '0600', hasElt: true }
     };
     /* Default values if you leave a property out of a fleet entry */
@@ -42,7 +42,7 @@
             Object.keys(FLEET).map(r => `<option value="${r}">${r}</option>`).join('');
         /* put picker just above the big maroon title */
         const banner = Array.from(doc.querySelectorAll('div'))
-        .find(div => /FLIGHT\s*PLAN\s*MESSAGE/i.test(div.textContent)) || doc.body;
+            .find(div => /FLIGHT\s*PLAN\s*MESSAGE/i.test(div.textContent)) || doc.body;
         banner.parentNode.insertBefore(sel, banner);
 
         sel.addEventListener('change', () => autofill(doc, sel.value));
@@ -52,16 +52,27 @@
     function autofill(doc, reg) {
         if (!reg) return;
         const d = new Date();
-        d.setUTCMinutes(d.getUTCMinutes() + 30);
-        d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 10) * 10, 0, 0);
+        let minutes = d.getUTCMinutes();
 
-        const hhmm = d.toISOString().slice(11,16).replace(':','');
-        const iso = d.toISOString().slice(0,10).replace(/-/g,'');
+        if (minutes % 10 === 0) {
+            // exact x0 → add 40 min
+            d.setUTCMinutes(minutes + 40);
+        } else {
+            // otherwise → add 30 min
+            d.setUTCMinutes(minutes + 30);
+
+            // then round up to next 10
+            const newMinutes = d.getUTCMinutes();
+            d.setUTCMinutes(Math.ceil(newMinutes / 10) * 10);
+        }
+
+        const hhmm = d.toISOString().slice(11, 16).replace(':', '');
+        const iso = d.toISOString().slice(0, 10).replace(/-/g, '');
         const dof = iso.slice(2);
         const ac = { ...DEFAULTS, ...FLEET[reg] };
 
         /* helper: set by name (first matching element) */
-        const set = (name,val) => {
+        const set = (name, val) => {
             const el = doc.querySelector(`[name="${name}"]`);
             if (el) el.value = val;
         };
@@ -84,7 +95,7 @@
         set('ADEP', 'ZZZZ');
         set('TTLEET', '0900');
         set('ALTRNT1', 'LRBV');
-        set('ALTRNT2', 'LRSP');
+        set('ALTRNT2', 'LRSB');
         set('DEPZ', 'GHIMBAV 4541N02531E');
         set('DESTZ', 'GHIMBAV 4541N02531E');
         set('OPR', 'AEROCLUBUL ROMANIEI');
@@ -97,14 +108,14 @@
         /** convenience: untick everything first, then tick what we need */
         const untickAll = name => {
             doc.querySelectorAll(`input[type="checkbox"][name="${name}"]`)
-               .forEach(cb => { cb.checked = false; });
-          };
+                .forEach(cb => { cb.checked = false; });
+        };
 
-        const tickSet = (name, codes /*string like "SDFG" or "E1E2"*/ ) =>
-        codes.match(/([A-Z]\d?)/g)?.forEach(code => {
-            const cb = doc.querySelector(`input[type="checkbox"][name="${name}"][value="${code}"]`);
-            if (cb) cb.checked = true;
-        });
+        const tickSet = (name, codes /*string like "SDFG" or "E1E2"*/) =>
+            codes.match(/([A-Z]\d?)/g)?.forEach(code => {
+                const cb = doc.querySelector(`input[type="checkbox"][name="${name}"][value="${code}"]`);
+                if (cb) cb.checked = true;
+            });
 
         untickAll('EQPT');
         untickAll('SEQPT');
@@ -119,8 +130,7 @@
         tickSet('JACKETS', 'LFUV');
         tickSet('UHF', 'U');
 
-        if (!ac.hasElt)
-        {
+        if (!ac.hasElt) {
             tickSet('UHT', 'E');
         }
 
