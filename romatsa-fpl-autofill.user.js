@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.9
+// @version      1.0.10
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -83,7 +83,8 @@
         set('ADES', 'ZZZZ');
         set('ADEP', 'ZZZZ');
         set('TTLEET', '0900');
-        set('ALTRNT1', 'LRSB');
+        set('ALTRNT1', 'LRBV');
+        set('ALTRNT2', 'LRSP');
         set('DEPZ', 'GHIMBAV 4541N02531E');
         set('DESTZ', 'GHIMBAV 4541N02531E');
         set('OPR', 'AEROCLUBUL ROMANIEI');
