@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight‑plan autofill
-// @version      1.0.11
+// @version      1.0.12
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -18,10 +18,13 @@
         'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE' },
         'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND BLUE AND RED', endurance: '0400' },
-        'YRARI': { type: 'CRUZ', wake: 'L', equip: 'ODY', surv: 'S', speed: 'K0160', level: 'VFR', color: 'WHITE AND BLUE DOTS', endurance: '0600', hasElt: true }
+        'YRARL': { type: 'CRUZ', wake: 'L', equip: 'ODY', surv: 'S', speed: 'K0160', level: 'VFR', color: 'WHITE AND BLUE DOTS', endurance: '0600', hasElt: true },
+        'YRZCP': { type: 'Z42', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0170', level: 'VFR', color: 'WHITE AND RED', endurance: '0500', hasElt: true },
+        'YR1810': { type: 'ZZZZ', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', level: 'VFR', color: 'WHITE AND RED', endurance: '0600', typz: 'IS28M2' },
+        'YRPBF': { type: 'AN2', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0180', level: 'VFR', color: 'WHITE AND BLUE', endurance: '0300' }
     };
     /* Default values if you leave a property out of a fleet entry */
-    const DEFAULTS = { speed: 'K0140', level: 'VFR', endurance: '0500', hasElt: false };
+    const DEFAULTS = { speed: 'K0140', level: 'VFR', typz: '', endurance: '0500', hasElt: false };
     /* ──────────────────────────────────────────────── */
 
     /* wait for iframe to load */
@@ -102,6 +105,7 @@
         set('ENDURANCE', ac.endurance);
         set('PERSONBOARD', '2');
         set('ACFT_COLOUR', ac.color);
+        set('TYPZ', ac.typz); //ALTERNATE TYPE IF type = ZZZZ
 
         /* 2 ── TICK the correct equipment & capability boxes */
 
