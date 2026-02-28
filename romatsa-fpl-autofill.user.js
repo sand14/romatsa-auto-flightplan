@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight-plan autofill
-// @version      1.1.0
+// @version      1.2.0
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -11,44 +11,197 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @grant        GM_deleteValue
+// @grant        GM_xmlhttpRequest
+// @connect      firestore.googleapis.com
 // ==/UserScript==
 
 (async function () {
     'use strict';
 
-    /* ─────── YOUR FLEET (defaults) ─────── */
-    const DEFAULT_FLEET = {
-        'YR5651': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', color: 'WHITE AND BLUE', endurance: '0500', pob: '2' },
-        'YR5604': { type: 'SVNH', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', color: 'WHITE AND BLUE', endurance: '0500', pob: '2' },
-        'YRBVI': { type: 'IR46', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', color: 'WHITE AND BLUE AND RED', endurance: '0400', pob: '2' },
-        'YRARL': { type: 'CRUZ', wake: 'L', equip: 'ODY', surv: 'S', speed: 'K0160', color: 'WHITE AND BLUE DOTS', endurance: '0600', hasElt: true, pob: '2' },
-        'YRZCP': { type: 'Z42', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0170', color: 'WHITE AND RED', endurance: '0500', hasElt: true, pob: '2' },
-        'YR1810': { type: 'ZZZZ', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0140', color: 'WHITE AND RED', endurance: '0600', typz: 'IS28M2', pob: '2' },
-        'YRPBF': { type: 'AN2', wake: 'L', equip: 'Y', surv: 'S', speed: 'K0180', color: 'WHITE AND BLUE', endurance: '0300', pob: '2' }
-    };
-    const DEFAULTS = { speed: 'K0140', typz: '', endurance: '0500', hasElt: false, pob: '2' , wake: 'L' };
+    /* ─────── Per-field autofill fallbacks ─────── */
+    const DEFAULTS = { speed: 'K0140', typz: '', endurance: '0500', hasElt: false, pob: '2', wake: 'L' };
 
-    /* ─────── OTHER DEFAULT DETAILS ─────── */
-    const DEFAULT_DETAILS = {
-        ROUTE: 'ZONA BRASOV GHIMBAV',
-        ADES: 'ZZZZ',
-        ADEP: 'ZZZZ',
-        TTLEET: '0900',
-        ALTRNT1: 'LRBV',
-        ALTRNT2: 'LRSB',
-        DEPZ: 'GHIMBAV 4541N02531E',
-        DESTZ: 'GHIMBAV 4541N02531E',
-        OPR: 'AEROCLUBUL ROMANIEI',
-        RMK: '',
-    };
+    /* ─────── Firebase / Firestore config ─────── */
+    const FIREBASE_PROJECT_ID = 'auto-flight-plan';
+    const FIREBASE_API_KEY    = 'AIzaSyD7tRrn49vFLlohOf74-eT1kmVgWWgMpLU';
+    const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/profiles`;
 
-    /* ─────── Load saved or fallback ─────── */
-    let FLEET = await GM_getValue('fleet', DEFAULT_FLEET);
-    let DETAILS = await GM_getValue('details', DEFAULT_DETAILS);
+    /* ─────── Load saved config ─────── */
+    let FLEET   = await GM_getValue('fleet',   null);
+    let DETAILS = await GM_getValue('details', null);
+
+    // First run: no local data — prompt user to pick a cloud profile
+    if (!FLEET || !DETAILS) openCloudProfilesModal(true);
 
     /* ─────── Settings UI ─────── */
     GM_registerMenuCommand('Edit Fleet', () => openFleetEditor());
     GM_registerMenuCommand('Edit Defaults', () => openDefaultsEditor());
+    GM_registerMenuCommand('☁ Cloud Profiles', () => openCloudProfilesModal());
+
+    /* ─────── Firestore helpers ─────── */
+    function gmFetch(url, { method = 'GET', body } = {}) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method, url,
+                headers: { 'Content-Type': 'application/json' },
+                data: body ? JSON.stringify(body) : undefined,
+                onload: r => resolve({ ok: r.status >= 200 && r.status < 300, json: () => JSON.parse(r.responseText) }),
+                onerror: reject,
+            });
+        });
+    }
+
+    function toFsVal(v) {
+        if (typeof v === 'boolean') return { booleanValue: v };
+        if (typeof v === 'string')  return { stringValue: v };
+        if (v !== null && typeof v === 'object')
+            return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toFsVal(x)])) } };
+        return { nullValue: null };
+    }
+    function fromFsVal(v) {
+        if ('stringValue'  in v) return v.stringValue;
+        if ('booleanValue' in v) return v.booleanValue;
+        if ('mapValue'     in v) return Object.fromEntries(Object.entries(v.mapValue.fields).map(([k, x]) => [k, fromFsVal(x)]));
+        return null;
+    }
+    const toFsDoc   = obj => ({ fields: Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, toFsVal(v)])) });
+    const fromFsDoc = doc => Object.fromEntries(Object.entries(doc.fields).map(([k, v]) => [k, fromFsVal(v)]));
+
+    /* ─────── Cloud Profiles modal ─────── */
+    async function openCloudProfilesModal(firstRun = false) {
+        if (document.getElementById('script-settings-modal')) return;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            #script-settings-modal { position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; }
+            #script-settings-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+            #script-settings-box { position: relative; background: white; border-radius: 10px; padding: 16px; width: 95%; max-width: 600px; max-height: 90vh; overflow: auto; font-family: sans-serif; }
+            #script-settings-box h2 { margin-top: 0; }
+            .script-btn { padding: 4px 8px; cursor: pointer; border: 1px solid #aaa; border-radius: 4px; background: #f5f5f5; }
+            .cloud-profile-item { border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+            .cloud-profile-meta { flex: 1; }
+            .cloud-profile-name { font-weight: bold; font-size: 14px; }
+            .cloud-profile-sub  { font-size: 12px; color: #666; margin-top: 2px; }
+            .cloud-publish { border-top: 1px solid #ddd; margin-top: 14px; padding-top: 14px; }
+            .cloud-publish h3 { margin: 0 0 10px; font-size: 14px; }
+            .cloud-publish label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+            .cloud-publish input { width: 100%; padding: 5px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+            .cloud-publish-actions { text-align: right; }
+            #cloud-feedback { font-size: 13px; margin-top: 6px; min-height: 18px; }
+        `;
+        document.body.appendChild(style);
+
+        const root = document.createElement('div');
+        root.id = 'script-settings-modal';
+        root.innerHTML = `
+          <div id="script-settings-backdrop"></div>
+          <div id="script-settings-box">
+            <h2>☁ Cloud Profiles</h2>
+            ${firstRun ? '<p style="margin:0 0 12px;padding:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:13px;">No local configuration found. Select a profile below to get started.</p>' : ''}
+            <div id="cloud-profiles-list">Loading profiles…</div>
+            ${!firstRun ? `
+            <div class="cloud-publish">
+              <h3>Publish current config</h3>
+              <label>Profile name</label>
+              <input id="cloud-pub-name" type="text" placeholder="e.g. Aeroclub Brasov">
+              <label>Your name</label>
+              <input id="cloud-pub-author" type="text" placeholder="e.g. Sebastian">
+              <div class="cloud-publish-actions">
+                <button class="script-btn" id="cloud-pub-btn">Publish to Cloud</button>
+              </div>
+              <div id="cloud-feedback"></div>
+            </div>` : ''}
+            <div style="text-align:right;margin-top:12px">
+              <button class="script-btn" id="script-cancel">Close</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(root);
+
+        root.querySelector('#script-settings-backdrop').onclick = () => root.remove();
+        root.querySelector('#script-cancel').onclick = () => root.remove();
+
+        const listEl = root.querySelector('#cloud-profiles-list');
+        const feedback = root.querySelector('#cloud-feedback');
+
+        /* ── Load profiles ── */
+        const renderProfiles = async () => {
+            listEl.textContent = 'Loading profiles…';
+            try {
+                const res = await gmFetch(`${FIRESTORE_URL}?key=${FIREBASE_API_KEY}&pageSize=50`);
+                if (!res.ok) throw new Error('Fetch failed');
+                const data = res.json();
+                const docs = data.documents || [];
+                if (docs.length === 0) {
+                    listEl.textContent = 'No profiles yet — be the first to publish one!';
+                    return;
+                }
+                listEl.innerHTML = '';
+                docs.forEach(doc => {
+                    const p = fromFsDoc(doc);
+                    const date = p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '';
+                    const item = document.createElement('div');
+                    item.className = 'cloud-profile-item';
+                    item.innerHTML = `
+                      <div class="cloud-profile-meta">
+                        <div class="cloud-profile-name">${p.name || '(unnamed)'}</div>
+                        <div class="cloud-profile-sub">by ${p.author || 'unknown'} · ${date}</div>
+                      </div>
+                      <button class="script-btn">Load</button>
+                    `;
+                    item.querySelector('button').onclick = async () => {
+                        if (!confirm(`Load profile "${p.name}"? This will overwrite your local fleet and defaults.`)) return;
+                        FLEET   = p.fleet;
+                        DETAILS = p.details;
+                        await GM_setValue('fleet', FLEET);
+                        await GM_setValue('details', DETAILS);
+                        root.remove();
+                        alert('Profile loaded! Reload the page to apply changes.');
+                    };
+                    listEl.appendChild(item);
+                });
+            } catch (e) {
+                listEl.textContent = 'Failed to load profiles. Check your Firebase credentials.';
+            }
+        };
+
+        await renderProfiles();
+
+        /* ── Publish ── */
+        root.querySelector('#cloud-pub-btn').onclick = async () => {
+            const name   = root.querySelector('#cloud-pub-name').value.trim();
+            const author = root.querySelector('#cloud-pub-author').value.trim();
+            if (!name || !author) { feedback.textContent = 'Please fill in both fields.'; return; }
+            feedback.textContent = 'Publishing…';
+            feedback.style.color = '';
+            // Derive a stable document ID from the profile name so names are unique and immutable.
+            // currentDocument.exists=false makes Firestore reject the request if the ID is already taken.
+            const docId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const url = `${FIRESTORE_URL}/${docId}?currentDocument.exists=false&key=${FIREBASE_API_KEY}`;
+            try {
+                const body = toFsDoc({ name, author, fleet: FLEET, details: DETAILS, createdAt: new Date().toISOString() });
+                const res = await gmFetch(url, { method: 'PATCH', body });
+                if (!res.ok) {
+                    const err = res.json();
+                    const alreadyExists = err?.error?.status === 'ALREADY_EXISTS';
+                    feedback.style.color = 'red';
+                    feedback.textContent = alreadyExists
+                        ? `A profile named "${name}" already exists. Choose a different name.`
+                        : `Publish failed: ${err?.error?.message ?? err?.error?.status ?? 'unknown error'}`;
+                    return;
+                }
+                feedback.style.color = 'green';
+                feedback.textContent = 'Published! Refreshing list…';
+                root.querySelector('#cloud-pub-name').value = '';
+                root.querySelector('#cloud-pub-author').value = '';
+                await renderProfiles();
+                feedback.textContent = '';
+            } catch (e) {
+                feedback.style.color = 'red';
+                feedback.textContent = `Publish failed: ${e?.message ?? String(e)}`;
+            }
+        };
+    }
 
     function createModal(title, contentBuilder, onSave) {
         if (document.getElementById('script-settings-modal')) return;
@@ -102,26 +255,22 @@
     /* ─────── Fleet editor ─────── */
     function openFleetEditor() {
         createModal('Edit Fleet', content => {
-            Object.entries(FLEET).forEach(([reg, data]) => addFleetRow(content, reg, data));
+            if (FLEET) Object.entries(FLEET).forEach(([reg, data]) => addFleetRow(content, reg, data));
             const addBtn = document.createElement('button');
             addBtn.textContent = '+ Add Aircraft';
             addBtn.className = 'script-btn';
             addBtn.onclick = () => addFleetRow(content, '', {});
             content.appendChild(addBtn);
 
-            // Reset button
-            const resetBtn = document.createElement('button');
-            resetBtn.textContent = 'Reset to Defaults';
-            resetBtn.type = 'button';
-            resetBtn.style.marginLeft = '12px';
-            resetBtn.addEventListener('click', async () => {
-                if (confirm("Reset fleet to built-in values?")) {
-                    await GM_deleteValue('fleet');
-                    FLEET = DEFAULT_FLEET; // use your hardcoded fleet object
-                    alert("Fleet reset. Please reopen the editor.");
-                }
+            const cloudBtn = document.createElement('button');
+            cloudBtn.textContent = '☁ Load from Cloud';
+            cloudBtn.type = 'button';
+            cloudBtn.style.marginLeft = '12px';
+            cloudBtn.addEventListener('click', () => {
+                document.getElementById('script-settings-modal')?.remove();
+                openCloudProfilesModal();
             });
-            content.appendChild(resetBtn);
+            content.appendChild(cloudBtn);
         }, async content => {
             const rows = content.querySelectorAll('.script-row');
             const newFleet = {};
@@ -175,7 +324,7 @@
             wrapper.className = 'script-defaults';
             content.appendChild(wrapper);
 
-            Object.entries(DETAILS).forEach(([key, val]) => {
+            (DETAILS ? Object.entries(DETAILS) : []).forEach(([key, val]) => {
                 const row = document.createElement('div');
                 row.className = 'defaults-row';
 
@@ -193,19 +342,15 @@
                 wrapper.appendChild(row);
             });
 
-            // Reset button
-            const resetBtn = document.createElement('button');
-            resetBtn.textContent = 'Reset to Defaults';
-            resetBtn.type = 'button';
-            resetBtn.style.marginTop = '12px';
-            resetBtn.addEventListener('click', async () => {
-                if (confirm("Reset defaults to built-in values?")) {
-                    await GM_deleteValue('details');
-                    DETAILS = DEFAULT_DETAILS;
-                    alert("Defaults reset. Please reopen the editor.");
-                }
+            const cloudBtn = document.createElement('button');
+            cloudBtn.textContent = '☁ Load from Cloud';
+            cloudBtn.type = 'button';
+            cloudBtn.style.marginTop = '12px';
+            cloudBtn.addEventListener('click', () => {
+                document.getElementById('script-settings-modal')?.remove();
+                openCloudProfilesModal();
             });
-            content.appendChild(resetBtn);
+            content.appendChild(cloudBtn);
         }, async content => {
             const inputs = content.querySelectorAll('input');
             const newDetails = {};
@@ -224,6 +369,7 @@
     function onFrameLoad() {
         const doc = frame.contentDocument;
         if (!doc || doc.querySelector('#acPicker')) return;
+        if (!FLEET) return; // no profile loaded yet
 
         /* build picker */
         const sel = doc.createElement('select');
@@ -277,7 +423,7 @@
         set('FLLEVEL', 'VFR'); // always VFR
 
         // use DETAILS instead of hardcoded
-        Object.entries(DETAILS).forEach(([k, v]) => set(k, v));
+        if (DETAILS) Object.entries(DETAILS).forEach(([k, v]) => set(k, v));
 
         set('ENDURANCE', ac.endurance);
         set('PERSONBOARD', ac.pob);
