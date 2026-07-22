@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight-plan autofill
-// @version      1.2.0
+// @version      1.3.0
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -27,8 +27,9 @@
     const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/profiles`;
 
     /* ─────── Load saved config ─────── */
-    let FLEET   = await GM_getValue('fleet',   null);
-    let DETAILS = await GM_getValue('details', null);
+    let FLEET         = await GM_getValue('fleet',          null);
+    let DETAILS       = await GM_getValue('details',        null);
+    let sunsetLanding = await GM_getValue('sunsetLanding',  false);
 
     // First run: no local data — prompt user to pick a cloud profile
     if (!FLEET || !DETAILS) openCloudProfilesModal(true);
@@ -351,13 +352,81 @@
                 openCloudProfilesModal();
             });
             content.appendChild(cloudBtn);
+
+            /* ── Advanced settings ── */
+            const sep = document.createElement('hr');
+            sep.style.margin = '16px 0 10px';
+            content.appendChild(sep);
+
+            const advTitle = document.createElement('div');
+            advTitle.textContent = 'Advanced Settings';
+            advTitle.style.cssText = 'font-size:13px;font-weight:bold;margin-bottom:8px;';
+            content.appendChild(advTitle);
+
+            const sunsetLabel = document.createElement('label');
+            sunsetLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;';
+            const sunsetCb = document.createElement('input');
+            sunsetCb.type = 'checkbox';
+            sunsetCb.id = 'opt-sunset-landing';
+            sunsetCb.checked = sunsetLanding;
+            sunsetLabel.appendChild(sunsetCb);
+            sunsetLabel.appendChild(document.createTextNode('🌅 Set TTLEET to sunset time in Brașov (sunset − IOBT)'));
+            content.appendChild(sunsetLabel);
+
         }, async content => {
-            const inputs = content.querySelectorAll('input');
+            // Only collect inputs that belong to DETAILS (have data-key set)
+            const inputs = content.querySelectorAll('input[data-key]');
             const newDetails = {};
             inputs.forEach(inp => newDetails[inp.dataset.key] = inp.value);
             DETAILS = newDetails;
             await GM_setValue('details', DETAILS);
+
+            const cb = content.querySelector('#opt-sunset-landing');
+            if (cb) {
+                sunsetLanding = cb.checked;
+                await GM_setValue('sunsetLanding', sunsetLanding);
+            }
         });
+    }
+
+    /* ─────── Sunset calculator (Brașov, Romania) ─────── */
+    // Returns UTC minutes from midnight for sunset on the given Date.
+    function getSunsetUTC(date) {
+        const LAT = 45.6427;
+        const LON = 25.5887;
+        const toRad = d => d * Math.PI / 180;
+        const toDeg = r => r * 180 / Math.PI;
+
+        const dayOfYear = Math.floor(
+            (date - new Date(date.getUTCFullYear(), 0, 0)) / 86400000
+        );
+        // Fractional year (radians)
+        const gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
+
+        // Equation of time (minutes)
+        const eqtime = 229.18 * (
+            0.000075
+            + 0.001868 * Math.cos(gamma)    - 0.032077 * Math.sin(gamma)
+            - 0.014615 * Math.cos(2 * gamma) - 0.04089  * Math.sin(2 * gamma)
+        );
+
+        // Solar declination (radians)
+        const decl =
+            0.006918
+            - 0.399912 * Math.cos(gamma)     + 0.070257 * Math.sin(gamma)
+            - 0.006758 * Math.cos(2 * gamma)  + 0.000907 * Math.sin(2 * gamma)
+            - 0.002697 * Math.cos(3 * gamma)  + 0.001480 * Math.sin(3 * gamma);
+
+        // Hour-angle cosine at sunset (solar zenith = 90.833° accounting for refraction)
+        const cosHA = (Math.cos(toRad(90.833)) - Math.sin(toRad(LAT)) * Math.sin(decl))
+                    / (Math.cos(toRad(LAT)) * Math.cos(decl));
+
+        if (cosHA < -1 || cosHA > 1) return null; // polar night / midnight sun
+
+        const ha = toDeg(Math.acos(cosHA)); // always positive for sunset
+
+        // UTC minutes: solar noon offset + hour-angle offset - equation of time
+        return 720 - 4 * (LON - ha) - eqtime;
     }
 
     /* wait for iframe to load */
@@ -419,11 +488,28 @@
         set('IOBT', hhmm);
         set('IOBD', dof);
 
+        /* ── Sunset landing: TTLEET = sunset(Brasov) − IOBT ── */
+        if (sunsetLanding) {
+            const sunsetMin = getSunsetUTC(d);
+            if (sunsetMin !== null) {
+                const iobtMin  = d.getUTCHours() * 60 + d.getUTCMinutes();
+                const duration = Math.round(sunsetMin) - iobtMin + 5; // add 5 min buffer
+                if (duration > 0) {
+                    const hh = String(Math.floor(duration / 60)).padStart(2, '0');
+                    const mm = String(duration % 60).padStart(2, '0');
+                    set('TTLEET', hh + mm);
+                }
+            }
+        }
+
         set('SPEED', ac.speed);
         set('FLLEVEL', 'VFR'); // always VFR
 
-        // use DETAILS instead of hardcoded
-        if (DETAILS) Object.entries(DETAILS).forEach(([k, v]) => set(k, v));
+        // use DETAILS instead of hardcoded; skip TTLEET when sunset-landing mode computed it
+        if (DETAILS) Object.entries(DETAILS).forEach(([k, v]) => {
+            if (sunsetLanding && k === 'TTLEET') return;
+            set(k, v);
+        });
 
         set('ENDURANCE', ac.endurance);
         set('PERSONBOARD', ac.pob);
