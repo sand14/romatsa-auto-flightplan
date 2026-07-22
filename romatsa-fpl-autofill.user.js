@@ -505,8 +505,11 @@
         set('SPEED', ac.speed);
         set('FLLEVEL', 'VFR'); // always VFR
 
-        // use DETAILS instead of hardcoded
-        if (DETAILS) Object.entries(DETAILS).forEach(([k, v]) => set(k, v));
+        // use DETAILS instead of hardcoded; skip TTLEET when sunset-landing mode computed it
+        if (DETAILS) Object.entries(DETAILS).forEach(([k, v]) => {
+            if (sunsetLanding && k === 'TTLEET') return;
+            set(k, v);
+        });
 
         set('ENDURANCE', ac.endurance);
         set('PERSONBOARD', ac.pob);
