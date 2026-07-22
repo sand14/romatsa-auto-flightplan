@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ROMATSA flight-plan autofill
-// @version      1.2.0
+// @version      1.3.0
 // @author       Avrigeanu Sebastian
 // @license      MIT
 // @description  Adds an aircraft picker and fills the New Flight Plan form
@@ -493,7 +493,7 @@
             const sunsetMin = getSunsetUTC(d);
             if (sunsetMin !== null) {
                 const iobtMin  = d.getUTCHours() * 60 + d.getUTCMinutes();
-                const duration = Math.round(sunsetMin) - iobtMin;
+                const duration = Math.round(sunsetMin) - iobtMin + 5; // add 5 min buffer
                 if (duration > 0) {
                     const hh = String(Math.floor(duration / 60)).padStart(2, '0');
                     const mm = String(duration % 60).padStart(2, '0');
